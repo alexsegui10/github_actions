@@ -17,16 +17,15 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm install
 
-      - name: Run linter
+      - name: Run Linter
         run: npm run lint
 
   cypress_job:
     needs: linter_job
     runs-on: self-hosted
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,22 +35,65 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm install
 
-      - name: Ejecutar Cypress
+      - name: Run Cypress tests
         id: cypress
         uses: cypress-io/github-action@v6
+        continue-on-error: true     
         with:
           build: npm run build
           start: npm run start
           wait-on: http://localhost:3000
 
-      - name: Escribir outcome en result.txt
-        run: echo "${{ steps.cypress.outcome }}" > result.txt
+      - name: Save Cypress outcome
+        shell: pwsh
+        run: |
+          $OUTCOME = "${{ steps.cypress.outcome }}"
+          Set-Content -Path result.txt -Value $OUTCOME
 
-      - name: Subir artefacto result.txt
+      - name: Upload result artifact
         uses: actions/upload-artifact@v4
         with:
           name: cypress-result
           path: result.txt
+
+      - name: Mark job as successful (even if Cypress failed)
+        if: always()
+        run: echo "Cypress finished with ${{ steps.cypress.outcome }} but job passes ✅"
+
+  add_badge_job:
+    needs: cypress_job
+    if: always()                      
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Download Cypress result
+        uses: actions/download-artifact@v4
+        with:
+          name: cypress-result
+
+      - name: Read Cypress outcome
+        id: parse
+        shell: pwsh
+        run: |
+          $OUTCOME = (Get-Content -Raw result.txt).Trim()
+          echo "cypress_outcome=$OUTCOME" >> $env:GITHUB_OUTPUT
+
+      - name: Update README with custom badge action
+        uses: ./.github/actions
+        with:
+          outcome: ${{ steps.parse.outputs.cypress_outcome }}
+
+      - name: Commit and push README
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "chore: update test badge" || echo "No changes"
+          git push

@@ -1,0 +1,9 @@
+name: "Update README Badge"
+description: "Añade o actualiza el badge de resultado de Cypress en el README"
+inputs:
+  outcome:
+    description: "Resultado de los tests de Cypress (success|failure)"
+    required: true
+runs:
+  using: "node20"
+  main: "add_badge.js"
