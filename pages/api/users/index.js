@@ -8,10 +8,12 @@ function handler(req, res) {
       return getUsers();
     case "POST0":
       return createUser();
-    default:
-        return res.status(405).end(`Method ${req.method} Not Allowed`);
+
     case "DELETE":
       return deleteAllUsers();
+      
+    default:
+      return res.status(405).end(`Method ${req.method} Not Allowed`);
 
   }
 
