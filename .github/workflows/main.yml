@@ -5,95 +5,69 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   linter_job:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run Linter
-        run: npm run lint
+      - run: npm install
+      - run: npm run lint
 
   cypress_job:
     needs: linter_job
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run Cypress tests
+      - run: npm install
+      - name: Run Cypress
         id: cypress
         uses: cypress-io/github-action@v6
-        continue-on-error: true     
+        continue-on-error: true
         with:
           build: npm run build
           start: npm run start
           wait-on: http://localhost:3000
-
-      - name: Save Cypress outcome
-        shell: pwsh
-        run: |
-          $OUTCOME = "${{ steps.cypress.outcome }}"
-          Set-Content -Path result.txt -Value $OUTCOME
-
-      - name: Upload result artifact
-        uses: actions/upload-artifact@v4
+      - name: Save outcome
+        run: echo "${{ steps.cypress.outcome }}" > result.txt
+      - uses: actions/upload-artifact@v4
         with:
           name: cypress-result
           path: result.txt
 
-      - name: Mark job as successful (even if Cypress failed)
-        if: always()
-        run: echo "Cypress finished with ${{ steps.cypress.outcome }} but job passes ✅"
-
   add_badge_job:
     needs: cypress_job
-    if: always()                      
-    runs-on: self-hosted
+    if: always()
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           persist-credentials: true
-
-      - name: Download Cypress result
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: cypress-result
-
-      - name: Read Cypress outcome
+      - name: Read outcome
         id: parse
-        shell: pwsh
-        run: |
-          $OUTCOME = (Get-Content -Raw result.txt).Trim()
-          echo "cypress_outcome=$OUTCOME" >> $env:GITHUB_OUTPUT
-
-      - name: Update README with custom badge action
+        run: echo "cypress_outcome=$(cat result.txt | tr -d '\r\n')" >> $GITHUB_OUTPUT
+      - name: Update README badge
         uses: ./.github/actions
         with:
           outcome: ${{ steps.parse.outputs.cypress_outcome }}
-
       - name: Commit and push README
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git add README.md
           git commit -m "chore: update test badge" || echo "No changes"
           git push
