@@ -85,3 +85,35 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           working-directory: .
           prod: true
+
+  notification_job:
+    needs: [linter_job, cypress_job, add_badge_job, deploy_job]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compose subject and body
+        id: compose
+        run: |
+          echo "subject=Resultat del workflow executat" >> $GITHUB_OUTPUT
+          {
+            echo "body<<EOF"
+            echo "S'ha realitzat un push en la branca main que ha provocat l'execució del workflow project_workflow amb els següents resultats:"
+            echo
+            echo "- linter_job: ${{ needs.linter_job.result }}"
+            echo "- cypress_job: ${{ needs.cypress_job.result }}"
+            echo "- add_badge_job: ${{ needs.add_badge_job.result }}"
+            echo "- deploy_job: ${{ needs.deploy_job.result }}"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: ${{ steps.compose.outputs.subject }}
+          to: ${{ secrets.NOTIFY_TO }}
+          from: "CI Bot <${{ secrets.SMTP_USERNAME }}>"
+          content_type: text/plain
+          body: ${{ steps.compose.outputs.body }}
