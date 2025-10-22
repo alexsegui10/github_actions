@@ -150,6 +150,8 @@ tested with  [Cypress]
 
 RESULTAT DELS ÚLTIMS TESTS
 
+![Tests](https://img.shields.io/badge/test-failure-red)
+
 [test: success]
 ```
 
