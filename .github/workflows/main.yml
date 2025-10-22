@@ -16,10 +16,42 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install deps
-        run: npm ci
+        run: npm install
 
       - name: Run linter
         run: npm run lint
+
+  cypress_job:
+    needs: linter_job
+    runs-on: self-hosted
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install
+
+      - name: Ejecutar Cypress
+        id: cypress
+        uses: cypress-io/github-action@v6
+        with:
+          build: npm run build
+          start: npm run start
+          wait-on: http://localhost:3000
+
+      - name: Escribir outcome en result.txt
+        run: echo "${{ steps.cypress.outcome }}" > result.txt
+
+      - name: Subir artefacto result.txt
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-result
+          path: result.txt
